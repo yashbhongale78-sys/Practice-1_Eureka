@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CivicIQ — AI-Powered Civic Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            civic: { 500: '#3B82F6', 600: '#2563EB', 700: '#1D4ED8' }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Supabase JS for realtime (anon client) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .hero-gradient { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); }
+    .glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.12); }
+    .animate-float { animation: float 6s ease-in-out infinite; }
+    @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 min-h-screen transition-colors duration-300">
+
+  <!-- ── Navbar ──────────────────────────────────────────────── -->
+  <nav class="fixed top-0 inset-x-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-700">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">IQ</div>
+        <span class="font-bold text-xl text-slate-800 dark:text-white">CivicIQ</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <!-- Dark mode toggle -->
+        <label class="flex items-center gap-2 cursor-pointer">
+          <span class="text-sm text-slate-500 dark:text-slate-400">🌙</span>
+          <div class="relative">
+            <input type="checkbox" id="dark-mode-toggle" class="sr-only peer"/>
+            <div class="w-10 h-5 bg-slate-300 dark:bg-slate-600 rounded-full peer-checked:bg-blue-600 transition-colors"></div>
+            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
+          </div>
+        </label>
+        <a href="dashboard.html" class="text-sm text-blue-600 font-medium hover:underline">View Complaints</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Hero ────────────────────────────────────────────────── -->
+  <section class="hero-gradient pt-32 pb-20 px-4 relative overflow-hidden">
+    <!-- Decorative blobs -->
+    <div class="absolute top-20 right-10 w-64 h-64 bg-blue-500 opacity-10 rounded-full blur-3xl animate-float"></div>
+    <div class="absolute bottom-0 left-20 w-96 h-96 bg-indigo-600 opacity-10 rounded-full blur-3xl"></div>
+
+    <div class="max-w-5xl mx-auto text-center relative z-10">
+      <div class="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 rounded-full px-4 py-1.5 text-sm font-medium mb-6">
+        <span class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
+        AI-Powered Civic Intelligence Platform
+      </div>
+      <h1 class="text-4xl md:text-6xl font-extrabold text-white mb-6 leading-tight">
+        Your city's issues,<br/>
+        <span class="text-blue-400">intelligently prioritized.</span>
+      </h1>
+      <p class="text-slate-300 text-lg md:text-xl max-w-2xl mx-auto mb-10">
+        Report civic issues, upvote what matters most, and let AI ensure the right problems get fixed first. Powered by Gemini.
+      </p>
+
+      <!-- Feature pills -->
+      <div class="flex flex-wrap justify-center gap-3 mb-10">
+        <span class="glass text-white px-4 py-2 rounded-full text-sm">🤖 AI Priority Scoring</span>
+        <span class="glass text-white px-4 py-2 rounded-full text-sm">📊 Real-Time Analytics</span>
+        <span class="glass text-white px-4 py-2 rounded-full text-sm">🔁 Duplicate Detection</span>
+        <span class="glass text-white px-4 py-2 rounded-full text-sm">⚡ Live Updates</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Auth Forms ───────────────────────────────────────────── -->
+  <section class="max-w-md mx-auto px-4 -mt-12 relative z-20 mb-20">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+
+      <!-- Tabs -->
+      <div class="flex border-b border-slate-200 dark:border-slate-700">
+        <button id="tab-login" onclick="switchTab('login')"
+          class="flex-1 py-4 text-sm font-semibold text-blue-600 border-b-2 border-blue-600 transition-colors">
+          Sign In
+        </button>
+        <button id="tab-register" onclick="switchTab('register')"
+          class="flex-1 py-4 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 border-b-2 border-transparent transition-colors">
+          Register
+        </button>
+      </div>
+
+      <!-- Login Form -->
+      <div id="form-login" class="p-8">
+        <h2 class="text-xl font-bold text-slate-800 dark:text-white mb-6">Welcome back</h2>
+        <form id="login-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Email</label>
+            <input type="email" id="login-email" required placeholder="citizen@example.com"
+              class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"/>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Password</label>
+            <input type="password" id="login-password" required placeholder="••••••••"
+              class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"/>
+          </div>
+          <p id="login-error" class="text-red-500 text-sm hidden"></p>
+          <button type="submit" id="login-btn"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors">
+            Sign In
+          </button>
+        </form>
+      </div>
+
+      <!-- Register Form -->
+      <div id="form-register" class="p-8 hidden">
+        <h2 class="text-xl font-bold text-slate-800 dark:text-white mb-6">Create account</h2>
+        <form id="register-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Full Name</label>
+            <input type="text" id="reg-name" required placeholder="Jane Smith"
+              class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"/>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Email</label>
+            <input type="email" id="reg-email" required placeholder="citizen@example.com"
+              class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"/>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Password (min 8 chars)</label>
+            <input type="password" id="reg-password" required minlength="8" placeholder="••••••••"
+              class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"/>
+          </div>
+          <p id="reg-error" class="text-red-500 text-sm hidden"></p>
+          <button type="submit" id="register-btn"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors">
+            Create Account
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Features Section ─────────────────────────────────────── -->
+  <section class="max-w-7xl mx-auto px-4 py-16 grid md:grid-cols-3 gap-6 mb-20">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700">
+      <div class="text-3xl mb-3">🏙️</div>
+      <h3 class="font-bold text-slate-800 dark:text-white mb-2">Smart Reporting</h3>
+      <p class="text-slate-500 dark:text-slate-400 text-sm">Submit complaints with photos. Gemini AI auto-categorizes severity and generates a structured summary.</p>
+    </div>
+    <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700">
+      <div class="text-3xl mb-3">📈</div>
+      <h3 class="font-bold text-slate-800 dark:text-white mb-2">Priority Engine</h3>
+      <p class="text-slate-500 dark:text-slate-400 text-sm">Dynamic scoring based on severity, community votes, duplicate reports, and time unresolved. Most urgent rises to the top.</p>
+    </div>
+    <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700">
+      <div class="text-3xl mb-3">🔔</div>
+      <h3 class="font-bold text-slate-800 dark:text-white mb-2">Live Updates</h3>
+      <p class="text-slate-500 dark:text-slate-400 text-sm">Supabase Realtime pushes updates instantly. See new complaints and vote counts without refreshing.</p>
+    </div>
+  </section>
+
+  <footer class="border-t border-slate-200 dark:border-slate-700 py-8 text-center text-sm text-slate-400">
+    CivicIQ © 2024 — Built for citizens, powered by AI
+  </footer>
+
+  <!-- Config: set these to your actual values -->
+  <script>
+    window.CIVICIQ_API_URL = "http://localhost:8000";
+    window.SUPABASE_URL = "YOUR_SUPABASE_URL";
+    window.SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+  </script>
+
+  <script type="module">
+    import { auth, saveSession, getUser, isLoggedIn } from './js/api.js';
+    import { showToast, setLoading, initDarkMode } from './js/ui.js';
+
+    // Init dark mode
+    initDarkMode();
+
+    // Redirect if already logged in
+    if (isLoggedIn()) {
+      const user = getUser();
+      window.location.href = user?.role === 'admin' ? 'admin.html' : 'dashboard.html';
+    }
+
+    // ── Tab switching ──────────────────────────────────────────
+    window.switchTab = function(tab) {
+      const isLogin = tab === 'login';
+      document.getElementById('form-login').classList.toggle('hidden', !isLogin);
+      document.getElementById('form-register').classList.toggle('hidden', isLogin);
+      document.getElementById('tab-login').className = `flex-1 py-4 text-sm font-semibold transition-colors border-b-2 ${isLogin ? 'text-blue-600 border-blue-600' : 'text-slate-500 border-transparent'}`;
+      document.getElementById('tab-register').className = `flex-1 py-4 text-sm font-semibold transition-colors border-b-2 ${!isLogin ? 'text-blue-600 border-blue-600' : 'text-slate-500 border-transparent'}`;
+    };
+
+    // ── Login ──────────────────────────────────────────────────
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('login-btn');
+      const errEl = document.getElementById('login-error');
+      errEl.classList.add('hidden');
+      setLoading(btn, true, 'Signing in...');
+      try {
+        const result = await auth.login(
+          document.getElementById('login-email').value,
+          document.getElementById('login-password').value
+        );
+        saveSession(result);
+        showToast('Welcome back!', 'success');
+        setTimeout(() => {
+          window.location.href = result.role === 'admin' ? 'admin.html' : 'dashboard.html';
+        }, 600);
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+        showToast(err.message, 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    // ── Register ───────────────────────────────────────────────
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('register-btn');
+      const errEl = document.getElementById('reg-error');
+      errEl.classList.add('hidden');
+      setLoading(btn, true, 'Creating account...');
+      try {
+        const result = await auth.register({
+          email: document.getElementById('reg-email').value,
+          password: document.getElementById('reg-password').value,
+          full_name: document.getElementById('reg-name').value,
+        });
+        saveSession(result);
+        showToast('Account created! Welcome to CivicIQ', 'success');
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+        showToast(err.message, 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+  </script>
+</body>
+</html>
