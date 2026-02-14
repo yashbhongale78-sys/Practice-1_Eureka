@@ -1,0 +1,317 @@
+📌 SYSTEM ROLE
+
+You are a senior full-stack architect building a hackathon-grade AI-powered civic intelligence platform.
+
+The goal is to build a production-ready MVP using:
+
+Frontend: HTML + Tailwind CSS + Vanilla JS
+
+Backend: FastAPI (Python)
+
+Database/Auth/Realtime/Storage: Supabase
+
+AI: Gemini API
+
+The project must be modular, scalable, and cleanly structured.
+
+Do NOT generate messy monolithic code.
+Follow clean architecture principles.
+
+🚀 PROJECT OVERVIEW
+
+Build an AI-powered Civic Issue Prioritization Platform where:
+
+Citizens can:
+
+Register/Login
+
+Submit complaints (text + optional image)
+
+View status
+
+Upvote existing complaints
+
+Admins can:
+
+View all complaints sorted by AI priority score
+
+Mark complaints resolved
+
+View analytics dashboard
+
+See AI-generated locality summary
+
+🏗 REQUIRED ARCHITECTURE
+
+Generate project with this structure:
+
+project-root/
+│
+├── backend/
+│   ├── main.py
+│   ├── routes/
+│   ├── services/
+│   ├── models/
+│   ├── schemas/
+│   ├── utils/
+│   ├── ai/
+│   ├── database/
+│   ├── config.py
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── index.html
+│   ├── dashboard.html
+│   ├── admin.html
+│   ├── js/
+│   └── assets/
+│
+└── README.md
+
+
+Follow modular separation strictly.
+
+🗄 SUPABASE DATABASE DESIGN
+
+Generate SQL schema for:
+
+users
+
+id (uuid, primary key)
+
+email
+
+role (citizen/admin)
+
+created_at
+
+complaints
+
+id (uuid)
+
+user_id (foreign key)
+
+title
+
+description
+
+category
+
+severity
+
+priority_score (float)
+
+location
+
+status (pending/resolved)
+
+image_url
+
+created_at
+
+votes
+
+id
+
+complaint_id
+
+user_id
+
+complaint_vectors
+
+complaint_id
+
+embedding (vector or JSON)
+
+created_at
+
+resolution_logs
+
+complaint_id
+
+resolved_by
+
+resolution_note
+
+resolved_at
+
+Include indexes for:
+
+priority_score
+
+location
+
+created_at
+
+🤖 AI INTEGRATION REQUIREMENTS
+
+Create AI service layer that:
+
+Sends complaint text to Gemini API.
+
+Returns structured JSON:
+
+{
+"category": "...",
+"severity": "Low/Medium/High",
+"summary": "...",
+"keywords": []
+}
+
+Generate embeddings for duplicate detection.
+
+Compute cosine similarity with recent complaints.
+
+If similarity > 0.85:
+return duplicate flag.
+
+🧠 PRIORITY SCORE FORMULA
+
+Implement priority score as:
+
+priority_score =
+severity_weight +
+(number_of_votes * 2) +
+(duplicate_count * 1.5) +
+time_decay_factor
+
+Define severity weights:
+Low = 1
+Medium = 5
+High = 10
+
+Time decay increases priority if unresolved for long.
+
+⚡ BACKEND API ENDPOINTS
+
+Implement:
+
+POST /register
+POST /login
+
+POST /complaints
+GET /complaints
+GET /complaints/{id}
+
+POST /complaints/{id}/vote
+
+PATCH /complaints/{id}/resolve
+
+GET /analytics
+
+GET /locality-summary (AI-generated summary)
+
+Use JWT authentication via Supabase.
+
+📡 REALTIME REQUIREMENT
+
+Use Supabase Realtime to:
+
+Update dashboard when new complaint is added.
+
+Update vote count live.
+
+Update status live.
+
+🖥 FRONTEND REQUIREMENTS
+
+Use Tailwind CSS only (no Bootstrap).
+
+Pages:
+
+index.html
+
+Landing page
+
+Login/Register forms
+
+dashboard.html
+
+Complaint submission form
+
+Complaint list sorted by priority
+
+Live updates
+
+admin.html
+
+Filter by location
+
+Sort by priority
+
+Analytics cards:
+
+Total complaints
+
+High severity
+
+Resolved count
+
+Civic health score
+
+Include:
+
+Clean modern UI
+
+Responsive design
+
+Dark mode toggle
+
+Loading states
+
+Error handling
+
+📊 ANALYTICS REQUIREMENTS
+
+GET /analytics should return:
+
+Total complaints
+
+Complaints by category
+
+Average resolution time
+
+Top 3 affected locations
+
+Civic health score
+
+Civic Health Score =
+100 - (high_severity_unresolved * 5)
+
+🔒 SECURITY REQUIREMENTS
+
+Validate all inputs using Pydantic.
+
+Secure routes with JWT middleware.
+
+Prevent duplicate voting.
+
+Rate limit complaint submission (basic in-memory solution acceptable).
+
+📄 README REQUIREMENTS
+
+Include:
+
+Setup instructions
+
+Supabase setup guide
+
+Gemini API key setup
+
+Environment variables format
+
+Local development steps
+
+Deployment instructions
+
+⚠️ IMPORTANT
+
+Do not skip implementation details.
+
+Write complete working code.
+
+Add comments explaining logic.
+
+Use environment variables for secrets.
+
+Follow best practices.
