@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — CivicIQ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .complaint-card { transition: transform 0.15s, box-shadow 0.15s; }
+    .complaint-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+    .priority-bar { height: 3px; border-radius: 2px; background: linear-gradient(90deg, #3B82F6, #8B5CF6); }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 min-h-screen text-slate-800 dark:text-white transition-colors duration-300">
+
+  <!-- ── Navbar ──────────────────────────────────────────────── -->
+  <nav class="fixed top-0 inset-x-0 z-40 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">IQ</div>
+        <span class="font-bold text-xl">CivicIQ</span>
+      </a>
+      <div class="flex items-center gap-4">
+        <label class="flex items-center gap-1.5 cursor-pointer">
+          <span class="text-sm">🌙</span>
+          <div class="relative">
+            <input type="checkbox" id="dark-mode-toggle" class="sr-only peer"/>
+            <div class="w-9 h-5 bg-slate-300 dark:bg-slate-600 rounded-full peer-checked:bg-blue-600 transition-colors"></div>
+            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
+          </div>
+        </label>
+        <span id="user-email" class="text-sm text-slate-500 dark:text-slate-400 hidden md:block"></span>
+        <button onclick="showComplaintModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+          + Report Issue
+        </button>
+        <button id="logout-btn" class="text-sm text-slate-500 hover:text-red-500 transition-colors">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Main ────────────────────────────────────────────────── -->
+  <main class="max-w-7xl mx-auto px-4 pt-24 pb-16">
+
+    <!-- Live indicator -->
+    <div class="flex items-center gap-2 mb-6">
+      <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+      <span class="text-sm text-slate-500 dark:text-slate-400">Live updates enabled</span>
+    </div>
+
+    <!-- Stats row -->
+    <div id="stats-row" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"></div>
+
+    <!-- Filters -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-700 mb-6">
+      <div class="flex flex-wrap gap-3">
+        <select id="filter-status" class="text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="in_progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+        </select>
+        <select id="filter-category" class="text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <option value="">All Categories</option>
+          <option>Road & Infrastructure</option>
+          <option>Water Supply</option>
+          <option>Sanitation</option>
+          <option>Electricity</option>
+          <option>Public Safety</option>
+          <option>Parks & Green Spaces</option>
+          <option>Noise Pollution</option>
+          <option>Other</option>
+        </select>
+        <input id="filter-location" type="text" placeholder="🔍 Filter by location..." 
+          class="text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 flex-1 min-w-[160px] focus:ring-2 focus:ring-blue-500 focus:outline-none"/>
+        <button onclick="loadComplaints()" class="bg-blue-50 dark:bg-blue-900/30 text-blue-600 text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-100 transition-colors">
+          Apply
+        </button>
+      </div>
+    </div>
+
+    <!-- Complaints list -->
+    <div id="complaints-list" class="space-y-4">
+      <!-- Populated by JS -->
+    </div>
+
+    <!-- Loading skeleton -->
+    <div id="loading-skeleton" class="space-y-4">
+      <div class="bg-white dark:bg-slate-800 rounded-xl h-32 animate-pulse border border-slate-100 dark:border-slate-700"></div>
+      <div class="bg-white dark:bg-slate-800 rounded-xl h-32 animate-pulse border border-slate-100 dark:border-slate-700"></div>
+      <div class="bg-white dark:bg-slate-800 rounded-xl h-32 animate-pulse border border-slate-100 dark:border-slate-700"></div>
+    </div>
+
+    <!-- Pagination -->
+    <div id="pagination" class="flex justify-center gap-2 mt-8"></div>
+  </main>
+
+  <!-- ── Submit Complaint Modal ───────────────────────────────── -->
+  <div id="complaint-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div class="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+        <h2 class="text-xl font-bold">Report a Civic Issue</h2>
+        <button onclick="hideComplaintModal()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+      </div>
+      <form id="complaint-form" class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Title <span class="text-red-500">*</span></label>
+          <input type="text" id="c-title" required minlength="5" maxlength="200"
+            placeholder="e.g., Large pothole on Main Street"
+            class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"/>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Description <span class="text-red-500">*</span></label>
+          <textarea id="c-description" required minlength="10" maxlength="2000" rows="4"
+            placeholder="Describe the issue in detail..."
+            class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none transition resize-none"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium mb-1">Category</label>
+            <select id="c-category" class="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="Road & Infrastructure">Road & Infrastructure</option>
+              <option value="Water Supply">Water Supply</option>
+              <option value="Sanitation">Sanitation</option>
+              <option value="Electricity">Electricity</option>
+              <option value="Public Safety">Public Safety</option>
+              <option value="Parks & Green Spaces">Parks & Green Spaces</option>
+              <option value="Noise Pollution">Noise Pollution</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Severity</label>
+            <select id="c-severity" class="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="Low">Low</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Location <span class="text-red-500">*</span></label>
+          <input type="text" id="c-location" required minlength="3"
+            placeholder="e.g., 5th Ave, Downtown, Mumbai"
+            class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"/>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Image URL (optional)</label>
+          <input type="url" id="c-image" placeholder="https://..."
+            class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"/>
+        </div>
+
+        <!-- AI analysis indicator -->
+        <div id="ai-indicator" class="hidden bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
+          <div class="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-sm">
+            <div class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            AI analyzing your complaint...
+          </div>
+        </div>
+
+        <p id="complaint-error" class="text-red-500 text-sm hidden"></p>
+        <button type="submit" id="submit-btn"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors">
+          Submit Complaint
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast-container" class="fixed bottom-6 right-6 flex flex-col gap-2 z-50"></div>
+
+  <!-- Config -->
+  <script>
+    window.CIVICIQ_API_URL = "http://localhost:8000";
+    window.SUPABASE_URL = "YOUR_SUPABASE_URL";
+    window.SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+  </script>
+
+  <script type="module">
+    import { complaints, auth, getUser, isLoggedIn } from './js/api.js';
+    import { showToast, setLoading, initDarkMode, severityBadge, statusBadge, timeAgo, escHtml } from './js/ui.js';
+    import { subscribeToComplaints, subscribeToVotes } from './js/realtime.js';
+
+    initDarkMode();
+
+    // Auth guard
+    if (!isLoggedIn()) { window.location.href = 'index.html'; }
+    const user = getUser();
+    const emailEl = document.getElementById('user-email');
+    if (emailEl && user) emailEl.textContent = user.email;
+    document.getElementById('logout-btn').addEventListener('click', auth.logout);
+
+    let currentPage = 1;
+    const PAGE_SIZE = 10;
+    let totalComplaints = 0;
+
+    // ── Load complaints ────────────────────────────────────────
+    async function loadComplaints(page = 1) {
+      currentPage = page;
+      showSkeleton(true);
+      try {
+        const params = {
+          page,
+          page_size: PAGE_SIZE,
+          status: document.getElementById('filter-status').value || null,
+          category: document.getElementById('filter-category').value || null,
+          location: document.getElementById('filter-location').value || null,
+          sort_by: 'priority_score'
+        };
+        const data = await complaints.list(params);
+        totalComplaints = data.total;
+        renderComplaints(data.complaints);
+        renderPagination(data.total, page);
+        renderStats(data.complaints);
+      } catch (err) {
+        showToast('Failed to load complaints: ' + err.message, 'error');
+      } finally {
+        showSkeleton(false);
+      }
+    }
+    window.loadComplaints = loadComplaints;
+
+    function renderStats(list) {
+      const total = list.length;
+      const high = list.filter(c => c.severity === 'High').length;
+      const resolved = list.filter(c => c.status === 'resolved').length;
+      const avgScore = list.length ? (list.reduce((s,c) => s + c.priority_score, 0) / list.length).toFixed(1) : 0;
+      document.getElementById('stats-row').innerHTML = `
+        ${stat('Total Shown', total, '📋', 'bg-blue-50 dark:bg-blue-900/20')}
+        ${stat('High Severity', high, '🔴', 'bg-red-50 dark:bg-red-900/20')}
+        ${stat('Resolved', resolved, '✅', 'bg-green-50 dark:bg-green-900/20')}
+        ${stat('Avg Priority', avgScore, '📊', 'bg-purple-50 dark:bg-purple-900/20')}
+      `;
+    }
+    function stat(label, value, icon, bg) {
+      return `<div class="rounded-xl p-4 ${bg} border border-slate-100 dark:border-slate-700">
+        <div class="text-2xl mb-1">${icon}</div>
+        <div class="text-2xl font-bold">${value}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400">${label}</div>
+      </div>`;
+    }
+
+    function renderComplaints(list) {
+      const el = document.getElementById('complaints-list');
+      if (!list.length) {
+        el.innerHTML = `<div class="text-center py-16 text-slate-400">
+          <div class="text-5xl mb-4">🏙️</div>
+          <p class="text-lg font-medium">No complaints found</p>
+          <p class="text-sm mt-1">Be the first to report a civic issue</p>
+        </div>`;
+        return;
+      }
+      el.innerHTML = list.map(c => complaintCard(c)).join('');
+    }
+
+    function complaintCard(c) {
+      const maxScore = 50;
+      const barWidth = Math.min(100, (c.priority_score / maxScore) * 100).toFixed(0);
+      const isDup = c.is_duplicate ? `<span class="text-xs bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 px-2 py-0.5 rounded-full">⚠ Duplicate Report</span>` : '';
+      return `
+        <div class="complaint-card bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-100 dark:border-slate-700 shadow-sm">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2 mb-2">
+                ${severityBadge(c.severity)}
+                ${statusBadge(c.status)}
+                <span class="text-xs text-slate-400 dark:text-slate-500">${escHtml(c.category)}</span>
+                ${isDup}
+              </div>
+              <h3 class="font-semibold text-base mb-1 truncate">${escHtml(c.title)}</h3>
+              <p class="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">${escHtml(c.ai_summary || c.description)}</p>
+              <div class="flex flex-wrap items-center gap-3 mt-3 text-xs text-slate-400">
+                <span>📍 ${escHtml(c.location)}</span>
+                <span>🕐 ${timeAgo(c.created_at)}</span>
+                <span>🎯 Score: <strong>${c.priority_score}</strong></span>
+              </div>
+              <!-- Priority bar -->
+              <div class="mt-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div class="priority-bar" style="width:${barWidth}%"></div>
+              </div>
+            </div>
+            <div class="flex flex-col items-center gap-1 shrink-0">
+              <button onclick="vote('${c.id}', this)" 
+                class="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-400 transition-colors group">
+                <span class="text-lg group-hover:scale-110 transition-transform">👍</span>
+                <span id="vote-${c.id}" class="text-xs font-bold text-slate-600 dark:text-slate-300">${c.vote_count || 0}</span>
+              </button>
+            </div>
+          </div>
+          ${c.image_url ? `<img src="${escHtml(c.image_url)}" alt="Issue photo" class="mt-3 rounded-lg w-full h-40 object-cover"/>` : ''}
+        </div>`;
+    }
+
+    function renderPagination(total, page) {
+      const pages = Math.ceil(total / PAGE_SIZE);
+      if (pages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+      let html = '';
+      for (let i = 1; i <= pages; i++) {
+        html += `<button onclick="loadComplaints(${i})"
+          class="w-9 h-9 rounded-lg text-sm font-medium transition-colors ${i === page ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-slate-50'}">
+          ${i}
+        </button>`;
+      }
+      document.getElementById('pagination').innerHTML = html;
+    }
+
+    function showSkeleton(show) {
+      document.getElementById('loading-skeleton').classList.toggle('hidden', !show);
+      document.getElementById('complaints-list').classList.toggle('hidden', show);
+    }
+
+    // ── Vote ───────────────────────────────────────────────────
+    window.vote = async function(id, btn) {
+      btn.disabled = true;
+      try {
+        const result = await complaints.vote(id);
+        document.getElementById(`vote-${id}`).textContent = result.vote_count;
+        showToast('Vote recorded!', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+        btn.disabled = false;
+      }
+    };
+
+    // ── Modal ──────────────────────────────────────────────────
+    window.showComplaintModal = () => {
+      if (!isLoggedIn()) { showToast('Please log in to report issues', 'warning'); return; }
+      document.getElementById('complaint-modal').classList.remove('hidden');
+    };
+    window.hideComplaintModal = () => document.getElementById('complaint-modal').classList.add('hidden');
+
+    // Close on backdrop click
+    document.getElementById('complaint-modal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) hideComplaintModal();
+    });
+
+    // ── Submit complaint ───────────────────────────────────────
+    document.getElementById('complaint-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      const errEl = document.getElementById('complaint-error');
+      const aiEl = document.getElementById('ai-indicator');
+      errEl.classList.add('hidden');
+      setLoading(btn, true, 'Analyzing...');
+      aiEl.classList.remove('hidden');
+
+      try {
+        await complaints.submit({
+          title: document.getElementById('c-title').value,
+          description: document.getElementById('c-description').value,
+          category: document.getElementById('c-category').value,
+          severity: document.getElementById('c-severity').value,
+          location: document.getElementById('c-location').value,
+          image_url: document.getElementById('c-image').value || null
+        });
+        showToast('Complaint submitted successfully!', 'success');
+        hideComplaintModal();
+        e.target.reset();
+        loadComplaints();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+        showToast(err.message, 'error');
+      } finally {
+        setLoading(btn, false);
+        aiEl.classList.add('hidden');
+      }
+    });
+
+    // ── Realtime ───────────────────────────────────────────────
+    subscribeToComplaints((newComplaint) => {
+      showToast('New complaint reported!', 'info');
+      loadComplaints(currentPage);
+    });
+    subscribeToVotes((voteData) => {
+      // Update vote count inline if visible
+      const el = document.getElementById(`vote-${voteData.complaint_id}`);
+      if (el) {
+        const current = parseInt(el.textContent) || 0;
+        el.textContent = current + 1;
+      }
+    });
+
+    // ── Init ───────────────────────────────────────────────────
+    loadComplaints();
+  </script>
+</body>
+</html>

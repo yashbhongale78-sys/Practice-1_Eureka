@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — CivicIQ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Chart.js for analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .complaint-row:hover { background: rgba(59, 130, 246, 0.04); }
+    .health-ring { transform: rotate(-90deg); }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 min-h-screen text-slate-800 dark:text-white transition-colors duration-300">
+
+  <!-- ── Sidebar ──────────────────────────────────────────────── -->
+  <aside class="fixed top-0 left-0 h-full w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 z-30 hidden lg:block">
+    <div class="p-6 border-b border-slate-200 dark:border-slate-700">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">IQ</div>
+        <div>
+          <div class="font-bold text-sm">CivicIQ Admin</div>
+          <div class="text-xs text-slate-500" id="admin-email">Loading...</div>
+        </div>
+      </div>
+    </div>
+    <nav class="p-4 space-y-1">
+      <button onclick="showSection('complaints')" id="nav-complaints"
+        class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors bg-blue-50 dark:bg-blue-900/30 text-blue-600">
+        📋 Complaints
+      </button>
+      <button onclick="showSection('analytics')" id="nav-analytics"
+        class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700">
+        📊 Analytics
+      </button>
+      <button onclick="showSection('summary')" id="nav-summary"
+        class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700">
+        🤖 AI Summary
+      </button>
+    </nav>
+    <div class="absolute bottom-6 left-4 right-4 space-y-2">
+      <div class="flex items-center gap-2 px-3">
+        <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-500">
+          🌙
+          <div class="relative">
+            <input type="checkbox" id="dark-mode-toggle" class="sr-only peer"/>
+            <div class="w-9 h-5 bg-slate-300 dark:bg-slate-600 rounded-full peer-checked:bg-blue-600 transition-colors"></div>
+            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
+          </div>
+        </label>
+      </div>
+      <button id="logout-btn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+        🚪 Logout
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main content ─────────────────────────────────────────── -->
+  <div class="lg:pl-64">
+    <!-- Mobile header -->
+    <header class="lg:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 h-14 flex items-center justify-between">
+      <span class="font-bold">CivicIQ Admin</span>
+      <div class="flex gap-3">
+        <button onclick="showSection('complaints')" class="text-xs px-3 py-1.5 bg-blue-100 text-blue-600 rounded-lg">Complaints</button>
+        <button onclick="showSection('analytics')" class="text-xs px-3 py-1.5 bg-slate-100 rounded-lg">Analytics</button>
+        <button onclick="showSection('summary')" class="text-xs px-3 py-1.5 bg-slate-100 rounded-lg">AI</button>
+      </div>
+    </header>
+
+    <main class="p-6">
+
+      <!-- ══ COMPLAINTS SECTION ══ -->
+      <section id="section-complaints">
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-2xl font-bold">Complaints Management</h1>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span class="text-sm text-slate-500">Live</span>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-700 mb-6">
+          <div class="flex flex-wrap gap-3">
+            <input id="a-location" type="text" placeholder="🔍 Location..." 
+              class="text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 w-44 focus:ring-2 focus:ring-blue-500 focus:outline-none"/>
+            <select id="a-category" class="text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="">All Categories</option>
+              <option>Road & Infrastructure</option>
+              <option>Water Supply</option>
+              <option>Sanitation</option>
+              <option>Electricity</option>
+              <option>Public Safety</option>
+              <option>Parks & Green Spaces</option>
+              <option>Noise Pollution</option>
+              <option>Other</option>
+            </select>
+            <select id="a-status" class="text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="resolved">Resolved</option>
+            </select>
+            <button onclick="loadAdminComplaints()" class="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">Apply</button>
+          </div>
+        </div>
+
+        <!-- Complaints table -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-600">
+                <tr class="text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <th class="px-4 py-3">Complaint</th>
+                  <th class="px-4 py-3">Category</th>
+                  <th class="px-4 py-3">Severity</th>
+                  <th class="px-4 py-3">Score</th>
+                  <th class="px-4 py-3">Votes</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3">Location</th>
+                  <th class="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-table-body" class="divide-y divide-slate-100 dark:divide-slate-700">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+          <!-- Loading state -->
+          <div id="table-loading" class="p-8 text-center text-slate-400 hidden">
+            <div class="inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+            <p class="text-sm">Loading...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ ANALYTICS SECTION ══ -->
+      <section id="section-analytics" class="hidden">
+        <h1 class="text-2xl font-bold mb-6">Analytics Dashboard</h1>
+
+        <!-- KPI cards -->
+        <div id="kpi-cards" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"></div>
+
+        <div class="grid lg:grid-cols-2 gap-6 mb-8">
+          <!-- Civic health score -->
+          <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-100 dark:border-slate-700">
+            <h3 class="font-semibold mb-4">Civic Health Score</h3>
+            <div class="flex items-center justify-center">
+              <div class="relative w-36 h-36">
+                <svg viewBox="0 0 120 120" class="w-36 h-36">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="#E2E8F0" stroke-width="10"/>
+                  <circle id="health-arc" cx="60" cy="60" r="50" fill="none" stroke="#3B82F6" stroke-width="10"
+                    stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round"
+                    class="health-ring transition-all duration-1000"/>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span id="health-score-val" class="text-3xl font-bold text-blue-600">--</span>
+                  <span class="text-xs text-slate-400">/ 100</span>
+                </div>
+              </div>
+            </div>
+            <p class="text-center text-sm text-slate-500 mt-3">Formula: 100 – (high severity unresolved × 5)</p>
+          </div>
+
+          <!-- Category chart -->
+          <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-100 dark:border-slate-700">
+            <h3 class="font-semibold mb-4">Complaints by Category</h3>
+            <canvas id="category-chart" height="200"></canvas>
+          </div>
+        </div>
+
+        <!-- Top locations + resolution time -->
+        <div class="grid lg:grid-cols-2 gap-6">
+          <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-100 dark:border-slate-700">
+            <h3 class="font-semibold mb-4">Top 3 Affected Locations</h3>
+            <div id="top-locations"></div>
+          </div>
+          <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-100 dark:border-slate-700">
+            <h3 class="font-semibold mb-4">Resolution Stats</h3>
+            <div id="resolution-stats"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ AI SUMMARY SECTION ══ -->
+      <section id="section-summary" class="hidden">
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-2xl font-bold">AI Locality Summary</h1>
+          <button onclick="loadSummary()" id="refresh-summary"
+            class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            🤖 Refresh AI Summary
+          </button>
+        </div>
+
+        <div id="summary-loading" class="bg-white dark:bg-slate-800 rounded-xl p-12 text-center border border-slate-100 dark:border-slate-700 hidden">
+          <div class="inline-block w-10 h-10 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p class="text-slate-500">Gemini is analyzing civic complaints...</p>
+        </div>
+
+        <div id="summary-content" class="space-y-6">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ── Resolve Modal ────────────────────────────────────────── -->
+  <div id="resolve-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-6">
+      <h2 class="text-xl font-bold mb-4">Resolve Complaint</h2>
+      <p id="resolve-title" class="text-slate-500 text-sm mb-4"></p>
+      <textarea id="resolve-note" rows="4" placeholder="Enter resolution notes..."
+        class="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none text-sm mb-4"></textarea>
+      <div class="flex gap-3">
+        <button onclick="hideResolveModal()" class="flex-1 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Cancel</button>
+        <button id="confirm-resolve" class="flex-1 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors">Confirm Resolved</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="fixed bottom-6 right-6 flex flex-col gap-2 z-50"></div>
+
+  <script>
+    window.CIVICIQ_API_URL = "http://localhost:8000";
+    window.SUPABASE_URL = "YOUR_SUPABASE_URL";
+    window.SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+  </script>
+
+  <script type="module">
+    import { complaints, analytics, auth, getUser, isLoggedIn, isAdmin } from './js/api.js';
+    import { showToast, setLoading, initDarkMode, severityBadge, statusBadge, timeAgo, escHtml } from './js/ui.js';
+    import { subscribeToComplaints, subscribeToVotes } from './js/realtime.js';
+
+    initDarkMode();
+
+    // Auth guard — must be admin
+    if (!isLoggedIn() || !isAdmin()) {
+      showToast('Admin access required', 'error');
+      setTimeout(() => { window.location.href = 'index.html'; }, 500);
+    }
+    const user = getUser();
+    const emailEl = document.getElementById('admin-email');
+    if (emailEl && user) emailEl.textContent = user.email;
+    document.getElementById('logout-btn').addEventListener('click', auth.logout);
+
+    let resolveTarget = null;
+    let categoryChartInstance = null;
+
+    // ── Section navigation ─────────────────────────────────────
+    window.showSection = function(name) {
+      ['complaints','analytics','summary'].forEach(s => {
+        document.getElementById(`section-${s}`).classList.add('hidden');
+        const nav = document.getElementById(`nav-${s}`);
+        if (nav) nav.className = 'w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700';
+      });
+      document.getElementById(`section-${name}`).classList.remove('hidden');
+      const nav = document.getElementById(`nav-${name}`);
+      if (nav) nav.className = 'w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors bg-blue-50 dark:bg-blue-900/30 text-blue-600';
+
+      if (name === 'analytics') loadAnalytics();
+      if (name === 'summary') loadSummary();
+    };
+
+    // ── Load complaints (admin) ────────────────────────────────
+    async function loadAdminComplaints() {
+      document.getElementById('table-loading').classList.remove('hidden');
+      document.getElementById('admin-table-body').innerHTML = '';
+      try {
+        const data = await complaints.list({
+          page: 1,
+          page_size: 50,
+          location: document.getElementById('a-location').value || null,
+          category: document.getElementById('a-category').value || null,
+          status: document.getElementById('a-status').value || null,
+          sort_by: 'priority_score'
+        });
+        renderTable(data.complaints);
+      } catch (err) {
+        showToast('Failed to load: ' + err.message, 'error');
+      } finally {
+        document.getElementById('table-loading').classList.add('hidden');
+      }
+    }
+    window.loadAdminComplaints = loadAdminComplaints;
+
+    function renderTable(list) {
+      const tbody = document.getElementById('admin-table-body');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400 text-sm">No complaints found</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = list.map(c => `
+        <tr class="complaint-row transition-colors">
+          <td class="px-4 py-3 max-w-xs">
+            <div class="font-medium text-sm truncate">${escHtml(c.title)}</div>
+            <div class="text-xs text-slate-400 mt-0.5">${timeAgo(c.created_at)}</div>
+          </td>
+          <td class="px-4 py-3 text-sm text-slate-500">${escHtml(c.category)}</td>
+          <td class="px-4 py-3">${severityBadge(c.severity)}</td>
+          <td class="px-4 py-3">
+            <span class="text-sm font-bold text-blue-600">${c.priority_score}</span>
+          </td>
+          <td class="px-4 py-3 text-sm text-center">👍 ${c.vote_count || 0}</td>
+          <td class="px-4 py-3">${statusBadge(c.status)}</td>
+          <td class="px-4 py-3 text-sm text-slate-500 max-w-[120px] truncate">${escHtml(c.location)}</td>
+          <td class="px-4 py-3">
+            ${c.status !== 'resolved' ? `
+              <button onclick="openResolve('${c.id}', '${escHtml(c.title).replace(/'/g, "\\'")}')"
+                class="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-3 py-1.5 rounded-lg hover:bg-green-200 transition-colors font-medium">
+                ✓ Resolve
+              </button>
+            ` : '<span class="text-xs text-green-500 font-medium">✓ Done</span>'}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // ── Resolve modal ──────────────────────────────────────────
+    window.openResolve = function(id, title) {
+      resolveTarget = id;
+      document.getElementById('resolve-title').textContent = title;
+      document.getElementById('resolve-note').value = '';
+      document.getElementById('resolve-modal').classList.remove('hidden');
+    };
+    window.hideResolveModal = () => document.getElementById('resolve-modal').classList.add('hidden');
+
+    document.getElementById('confirm-resolve').addEventListener('click', async () => {
+      const note = document.getElementById('resolve-note').value.trim();
+      if (!note || note.length < 5) { showToast('Please provide resolution notes (min 5 chars)', 'warning'); return; }
+      const btn = document.getElementById('confirm-resolve');
+      setLoading(btn, true, 'Resolving...');
+      try {
+        await complaints.resolve(resolveTarget, note);
+        showToast('Complaint marked as resolved', 'success');
+        hideResolveModal();
+        loadAdminComplaints();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    // ── Analytics ──────────────────────────────────────────────
+    async function loadAnalytics() {
+      try {
+        const data = await analytics.get();
+        renderKPIs(data);
+        renderHealthScore(data.civic_health_score);
+        renderCategoryChart(data.complaints_by_category);
+        renderTopLocations(data.top_3_locations);
+        renderResolutionStats(data);
+      } catch (err) {
+        showToast('Failed to load analytics: ' + err.message, 'error');
+      }
+    }
+
+    function renderKPIs(data) {
+      document.getElementById('kpi-cards').innerHTML = `
+        ${kpi('Total Complaints', data.total_complaints, '📋', 'blue')}
+        ${kpi('High Severity (Unresolved)', data.high_severity_unresolved, '🔴', 'red')}
+        ${kpi('Resolved', data.resolved_complaints, '✅', 'green')}
+        ${kpi('Civic Health', data.civic_health_score.toFixed(0) + '/100', '❤️', 'purple')}
+      `;
+    }
+    function kpi(label, value, icon, color) {
+      const cls = { blue: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20', red: 'text-red-600 bg-red-50 dark:bg-red-900/20', green: 'text-green-600 bg-green-50 dark:bg-green-900/20', purple: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20' }[color];
+      return `<div class="rounded-xl p-5 border border-slate-100 dark:border-slate-700 ${cls}">
+        <div class="text-2xl mb-2">${icon}</div>
+        <div class="text-2xl font-bold">${value}</div>
+        <div class="text-xs mt-0.5 opacity-70">${label}</div>
+      </div>`;
+    }
+
+    function renderHealthScore(score) {
+      const el = document.getElementById('health-arc');
+      const scoreEl = document.getElementById('health-score-val');
+      if (!el || !scoreEl) return;
+      const circ = 2 * Math.PI * 50;
+      const offset = circ - (score / 100) * circ;
+      el.style.strokeDashoffset = offset.toFixed(1);
+      el.style.stroke = score >= 70 ? '#22C55E' : score >= 40 ? '#F59E0B' : '#EF4444';
+      scoreEl.textContent = score.toFixed(0);
+      scoreEl.style.color = score >= 70 ? '#22C55E' : score >= 40 ? '#F59E0B' : '#EF4444';
+    }
+
+    function renderCategoryChart(categories) {
+      const ctx = document.getElementById('category-chart').getContext('2d');
+      if (categoryChartInstance) categoryChartInstance.destroy();
+      categoryChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: categories.map(c => c.category),
+          datasets: [{ data: categories.map(c => c.count), backgroundColor: ['#3B82F6','#EF4444','#22C55E','#F59E0B','#8B5CF6','#EC4899','#14B8A6','#6B7280'], borderWidth: 0, hoverOffset: 4 }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'right', labels: { font: { size: 11 }, padding: 10 } } }, cutout: '65%' }
+      });
+    }
+
+    function renderTopLocations(locations) {
+      const maxCount = locations[0]?.count || 1;
+      document.getElementById('top-locations').innerHTML = locations.map((loc, i) => `
+        <div class="mb-4">
+          <div class="flex justify-between text-sm mb-1">
+            <span class="font-medium">${i+1}. ${escHtml(loc.location)}</span>
+            <span class="text-slate-500">${loc.count} issues</span>
+          </div>
+          <div class="bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+            <div class="h-full bg-blue-500 rounded-full transition-all duration-700" style="width:${(loc.count/maxCount*100).toFixed(0)}%"></div>
+          </div>
+        </div>
+      `).join('') || '<p class="text-sm text-slate-400">No data</p>';
+    }
+
+    function renderResolutionStats(data) {
+      document.getElementById('resolution-stats').innerHTML = `
+        <div class="space-y-4">
+          <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+            <span class="text-sm">Avg Resolution Time</span>
+            <span class="font-bold text-sm">${data.avg_resolution_hours != null ? data.avg_resolution_hours + 'h' : 'N/A'}</span>
+          </div>
+          <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+            <span class="text-sm">Pending Complaints</span>
+            <span class="font-bold text-orange-500 text-sm">${data.pending_complaints}</span>
+          </div>
+          <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+            <span class="text-sm">Resolution Rate</span>
+            <span class="font-bold text-green-500 text-sm">
+              ${data.total_complaints ? ((data.resolved_complaints / data.total_complaints) * 100).toFixed(1) + '%' : '0%'}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+
+    // ── AI Summary ─────────────────────────────────────────────
+    async function loadSummary() {
+      const loading = document.getElementById('summary-loading');
+      const content = document.getElementById('summary-content');
+      loading.classList.remove('hidden');
+      content.innerHTML = '';
+      const btn = document.getElementById('refresh-summary');
+      setLoading(btn, true, '🔄 Generating...');
+
+      try {
+        const data = await analytics.localitySummary();
+        loading.classList.add('hidden');
+        content.innerHTML = `
+          <div class="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-100 dark:border-slate-700 shadow-sm">
+            <div class="flex items-center gap-2 mb-4">
+              <span class="text-xl">🤖</span>
+              <h3 class="font-semibold">AI Analysis</h3>
+              <span class="text-xs text-slate-400 ml-auto">Generated: ${new Date(data.generated_at).toLocaleString()}</span>
+            </div>
+            <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300 whitespace-pre-line">${escHtml(data.summary)}</p>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-6">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-100 dark:border-slate-700 shadow-sm">
+              <h3 class="font-semibold mb-4">🔥 Top Issues</h3>
+              <ul class="space-y-2">
+                ${(data.top_issues || []).map(issue => `
+                  <li class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    <span class="text-red-400 mt-0.5">•</span>
+                    ${escHtml(issue)}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-100 dark:border-slate-700 shadow-sm">
+              <h3 class="font-semibold mb-4">💡 Recommendations</h3>
+              <ul class="space-y-2">
+                ${(data.recommendations || []).map(rec => `
+                  <li class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    <span class="text-green-400 mt-0.5">→</span>
+                    ${escHtml(rec)}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        loading.classList.add('hidden');
+        content.innerHTML = `<div class="bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl p-6">
+          Failed to generate summary: ${escHtml(err.message)}
+        </div>`;
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+    window.loadSummary = loadSummary;
+
+    // ── Realtime ───────────────────────────────────────────────
+    subscribeToComplaints(() => {
+      showToast('New complaint submitted!', 'info');
+      loadAdminComplaints();
+    });
+    subscribeToVotes(() => loadAdminComplaints());
+
+    // ── Init ───────────────────────────────────────────────────
+    loadAdminComplaints();
+  </script>
+</body>
+</html>
